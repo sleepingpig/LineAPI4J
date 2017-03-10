@@ -58,6 +58,7 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.Header;
+import org.apache.http.HttpStatus;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.utils.HttpClientUtils;
@@ -101,7 +102,7 @@ public class LineApiImpl implements LineApi {
   private String ip = "127.0.0.1";
 
   /** The line application version. */
-  private String version = "4.7.0";
+  private String version = "5.1.2";
 
   /** The com_name. */
   private final String systemName;
@@ -160,11 +161,11 @@ public class LineApiImpl implements LineApi {
     if (osType.equals(OSType.WINDOWS)) {
       osVersion = "6.1.7600-7-x64";
       userAgent = "DESKTOP:WIN:" + osVersion + "(" + version + ")";
-      app = "DESKTOPWIN\t" + osVersion + "\tWINDOWS\t" + version;
+      app = "DESKTOPWIN\t" + version + "\tWINDOWS\t" + osVersion;
     } else {
       osVersion = "10.10.4-YOSEMITE-x64";
       userAgent = "DESKTOP:MAC:" + osVersion + "(" + version + ")";
-      app = "DESKTOPMAC\t" + osVersion + "\tMAC\t" + version;
+      app = "DESKTOPMAC\t" + version + "\tMAC\t" + osVersion;
     }
     List<Header> headers = new ArrayList<>();
 
@@ -185,7 +186,6 @@ public class LineApiImpl implements LineApi {
    */
   public Client ready() throws TTransportException {
 
-    //THttpClient transport = new THttpClient(LINE_HTTP_IN_URL);
     THttpClient transport = new THttpClient(LINE_HTTP_IN_URL, httpClient);
     transport.setCustomHeader(X_LINE_ACCESS, getAuthToken());
     transport.open();
@@ -347,8 +347,17 @@ public class LineApiImpl implements LineApi {
 
   private JsonNode getCertResult(String url) throws Exception {
     HttpGet httpGet = new HttpGet(url);
+    String authToken = getAuthToken();
+    if (authToken != null) {
+      httpGet.setHeader(X_LINE_ACCESS, getAuthToken());
+    }
     ObjectMapper objectMapper = new ObjectMapper();
-    return objectMapper.readTree(httpClient.execute(httpGet).getEntity().getContent());
+    org.apache.http.HttpResponse response = httpClient.execute(httpGet);
+    int statusCode = response.getStatusLine().getStatusCode();
+    if (statusCode != HttpStatus.SC_OK) {
+      throw new IOException("Fail to get certificate result. status: " + statusCode);
+    }
+    return objectMapper.readTree(response.getEntity().getContent());
   }
 
   public boolean postContent(String url, Map<String, Object> data, InputStream is) throws Exception {
